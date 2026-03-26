@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歌舞伎座</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #87CEEB, #98FB98);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(192, 234, 231, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 10px;
+            background: #006e54;
+            color: white;
+            border: black;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #556e54;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+       <div id="info">
+            <p></p>
+        </div>
+        <div id="controls">
+          <button id="openCurtain">幕を開ける</button>
+          <button id="closeCurtain">幕を閉じる</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // === 基本設定 ===
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // === ライティング ===
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(13.5, 10, 20);  //客席奥、中心から照らして立体感を出す
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 512;
+        directionalLight.shadow.mapSize.height = 512;
+        scene.add(directionalLight);
+
+        /* ===座標軸を表示（補助用）===
+        const axesHelper = new THREE.AxesHelper(200);
+        scene.add(axesHelper);*/
+
+
+        //==舞台(演出部分)の作成。色々いじりたいので、各面を個別に定義する＝＝
+        // サイズ定義
+        const stageWidth = 27;
+        const stageHeight = 6;
+        const stageDepth = 18;
+        const wallThickness = 0.01; // 壁の厚さ
+
+        const wallMaterial = new THREE.MeshLambertMaterial({ color: 0xcd853f });
+
+        // 左壁
+        const leftWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, stageHeight, stageDepth),
+            wallMaterial
+        );
+        leftWall.position.set(0, stageHeight / 2, -9);
+        scene.add(leftWall);
+
+        // 右壁
+        const rightWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, stageHeight, stageDepth),
+            wallMaterial
+        );
+        rightWall.position.set(stageWidth, stageHeight / 2, -9);
+        scene.add(rightWall);
+
+
+        /*背景（松羽目）
+        const loader = new THREE.TextureLoader();
+        const matsubameTexture = loader.load('matsubame.jpg'); 
+        matsubameTexture.wrapS = THREE.RepeatWrapping;
+        matsubameTexture.wrapT = THREE.RepeatWrapping;
+        matsubameTexture.repeat.set(1, 1); // 数値を調整して繰り返し表示
+        const matsubameMaterial = new THREE.MeshStandardMaterial({
+            map: matsubameTexture,
+            side: THREE.FrontSide
+        });*/
+
+        // 背景
+        const backWall = new THREE.Mesh(
+            new THREE.BoxGeometry(stageWidth, stageHeight, wallThickness),
+            wallMaterial
+        );
+        backWall.position.set(stageWidth / 2, stageHeight / 2, -18);
+        scene.add(backWall);
+
+        // 床
+        const floor = new THREE.Mesh(
+            new THREE.BoxGeometry(stageWidth, wallThickness, stageDepth),
+            wallMaterial
+        );
+        floor.position.set(stageWidth / 2, 0, -9);
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        //出囃子（赤いもうせんの台）
+        const debayashiGeometry=new THREE.BoxGeometry(27,2,2)
+        const debayashiMaterial=new THREE.MeshLambertMaterial({color:0xff0000}) //参照：https://www.colordic.org/
+        const debayashi=new THREE.Mesh(debayashiGeometry,debayashiMaterial);
+        debayashi.position.set(13.5,0,-16)
+        debayashi.receiveShadow=true;
+        scene.add(debayashi);
+
+        // === 定式幕をCanvasで作成 ===
+        const canvas = document.createElement('canvas');
+        canvas.width = 300;
+        canvas.height = 100;
+        const ctx = canvas.getContext('2d');
+
+        const colors = ['#000000', '#964514', '#006e54']; // 黒, 柿, 萌葱
+        for (let i = 0; i < 30; i++) {
+          ctx.fillStyle = colors[i%3];
+          ctx.fillRect(i * 10, 0, 27, 100);　//(x,y,width,height)
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide });
+        const geometry = new THREE.PlaneGeometry(27, 6);
+        const curtain = new THREE.Mesh(geometry, material);
+        curtain.position.set(13.5, 3, 0);
+        scene.add(curtain);
+
+        let isOpeningCurtain = false;
+        let isClosingCurtain = false;
+        let openCurtainTargetX = 40.5; // 幕を開けたあとのX座標
+        let closeCurtainTargetX= 13.5  //幕を閉じた後のX座標
+
+        document.getElementById('openCurtain').addEventListener('click', () => {
+            isOpeningCurtain = true;
+        });
+        document.getElementById('closeCurtain').addEventListener('click', () => {
+            isClosingCurtain = true;
+        });
+        // === 舞台(奈落部分）の作成===
+        const narakuGeometry=new THREE.BoxGeometry(27,2,18)   //CubeGeometryではなくBoxGeometryになったらしい　(W,H,D)
+        const narakuMaterial=new THREE.MeshLambertMaterial({color:0x8b4513}) //参照：https://www.colordic.org/
+        const naraku=new THREE.Mesh(narakuGeometry,narakuMaterial);
+        naraku.position.set(13.5,-1,-9)
+        naraku.receiveShadow=true;
+        scene.add(naraku);
+
+        //==花道の作成==
+        const hanamichiGeometry=new THREE.BoxGeometry(2,2,18)
+        const hanamichiMaterial=new THREE.MeshLambertMaterial({color:0xcd853f}) //参照：https://www.colordic.org/
+        const hanamichi=new THREE.Mesh(hanamichiGeometry,hanamichiMaterial);
+        hanamichi.position.set(3,-1,9)
+        hanamichi.receiveShadow=true;
+        scene.add(hanamichi);
+
+        // === 赤い提灯を作成して並べる ===
+        const lanternMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+        const lanternRadius = 0.4;
+        const lanternCount = 10;
+
+        // 提灯をgroupで生成
+        function createLantern() {
+            const group = new THREE.Group();
+
+            // 本体
+            const bodyGeometry = new THREE.SphereGeometry(0.33, 32, 32);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xff2222 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.scale.set(1, 1.5, 1);
+            group.add(body);
+
+            // 上下キャップ
+            const capGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.66, 32);
+            const capMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+
+            const topCap = new THREE.Mesh(capGeometry, capMaterial);
+            topCap.position.set(0, 0.3, 0);
+            group.add(topCap);
+
+            const bottomCap = new THREE.Mesh(capGeometry, capMaterial);
+            bottomCap.position.set(0, -0.3, 0);
+            group.add(bottomCap);
+
+
+            return group;
+        }
+
+
+
+        let i, j;
+        //左バルコニー
+        for (i = 0; i < lanternCount; i++) {
+            for (j=0; j<3; j++) {
+                const lantern = createLantern();
+                lantern.position.set(-1, 1+2*j, 2*(i+1)); // z軸に沿って並べる
+                scene.add(lantern);
+            }
+        }
+
+        //右バルコニー
+        for (i = 0; i < lanternCount; i++) {
+            for (j=0; j<3; j++) {
+                const lantern = createLantern();
+                lantern.position.set(28, 1+2*j, 2*(i+1)); 
+                scene.add(lantern);
+            }
+        }
+
+
+        // === カメラの初期位置設定 ===
+        camera.position.set(100, 100, 100);
+        camera.lookAt(13.5, 0, 9);  
+
+        // === マウスコントロール ===
+        let mouseX = 0, mouseY = 0, isMouseDown = false;
+        let cameraDistance = 30, cameraAngleX = Math.PI/16, cameraAngleY = Math.PI/3; //初期設定：舞台の全体が見渡せるように
+        document.addEventListener('mousedown', (e) => { isMouseDown = true; mouseX = e.clientX; mouseY = e.clientY; });
+        document.addEventListener('mouseup', () => { isMouseDown = false; });
+        document.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            cameraAngleY += (e.clientX - mouseX) * 0.01;
+            cameraAngleX += (e.clientY - mouseY) * 0.01;
+            cameraAngleX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraAngleX));
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+        document.addEventListener('wheel', (e) => {
+            cameraDistance += e.deltaY * 0.01;
+            cameraDistance = Math.max(30, Math.min(300, cameraDistance));
+        });
+
+        // === アニメーション関連 ===
+        /*let animationState = 'idle';*/
+        let animationTime = 0;
+        /*let originalRotations = {};*/
+
+        // === メインアニメーションループ ===
+        function animate() {
+            requestAnimationFrame(animate);
+            animationTime += 0.016;
+
+            // カメラ更新
+            camera.position.x = Math.cos(cameraAngleY) * Math.cos(cameraAngleX) * cameraDistance;
+            camera.position.y = Math.sin(cameraAngleX) * cameraDistance + 1; // 少し上から見るように調整
+            camera.position.z = Math.sin(cameraAngleY) * Math.cos(cameraAngleX) * cameraDistance;
+            camera.lookAt(13.5,0,9);
+            //幕を開ける
+            if (isOpeningCurtain && curtain.position.x < openCurtainTargetX) {
+                curtain.position.x += 0.1; // 幕を開けるスピード
+                if (curtain.position.x >= openCurtainTargetX) {
+                    curtain.position.x = openCurtainTargetX;
+                    isOpeningCurtain = false;
+                }
+            }
+            //幕を閉じる
+            if (isClosingCurtain && curtain.position.x > closeCurtainTargetX) {
+                curtain.position.x -= 0.1; // 幕を閉じるスピード
+                if (curtain.position.x <= closeCurtainTargetX) {
+                    curtain.position.x = closeCurtainTargetX;
+                    isClosingCurtain = false;
+                }
+            }
+            renderer.render(scene, camera);
+        }
+        
+
+        // === リサイズ対応 ===
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
