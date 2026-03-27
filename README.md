@@ -1,17 +1,1 @@
-# Title
-
-## Subtitle
-
-### Subsubtitle
-
-![image description](image path)
-
-This is normal text. *This is italic text*. **This is boldface text**. `This is inline code`.
-
-```
-This is a code box
-
-Can span multiple lines.
-
-Weeeeeee.
-```
+Read instructions (in JP) here: [33_Hirayama_instruction.pdf](https://github.com/user-attachments/files/26293368/33_Hirayama_instruction.pdf)
